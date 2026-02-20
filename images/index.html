@@ -1,0 +1,1045 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mitosis Creative Agency</title>
+  <style>
+    html, body { margin:0; background:#0b0b0f; }
+    canvas { display:block; width:100%; height:100vh; position:fixed; top:0; left:0; z-index:0; }
+    
+    .overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      pointer-events: none;
+    }
+    
+    .agency-title {
+      font: bold 48px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      text-shadow: 0 2px 16px #0b0b0f, 0 1px 0 #fff2;
+      letter-spacing: 0.02em;
+      pointer-events: auto;
+    }
+
+    .hero-tagline {
+      font: 20px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 255, 255, 0.95);
+      max-width: 520px;
+      text-align: center;
+      letter-spacing: 0.01em;
+      pointer-events: auto;
+    }
+
+    .value-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      max-width: 600px;
+      pointer-events: auto;
+      margin-top: 8px;
+    }
+
+    .chip {
+      font: 13px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      background: rgba(255, 214, 90, 0.1);
+      border: 1px solid rgba(255, 214, 90, 0.3);
+      border-radius: 20px;
+      padding: 8px 14px;
+      opacity: 0;
+      animation: chip-in 0.5s ease-out forwards;
+      animation-delay: calc(var(--chip-index, 0) * 80ms);
+    }
+
+    .chip:nth-child(1) { --chip-index: 1; }
+    .chip:nth-child(2) { --chip-index: 2; }
+    .chip:nth-child(3) { --chip-index: 3; }
+    .chip:nth-child(4) { --chip-index: 4; }
+
+    @keyframes chip-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .chip {
+        animation: none;
+        opacity: 1;
+      }
+    }
+    
+    .cta-btn {
+      font: bold 18px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #0b0b0f;
+      background: #ffd65a;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 32px;
+      box-shadow: 0 2px 12px #ffd65a44;
+      cursor: pointer;
+      transition: background .2s, transform .7s cubic-bezier(.6,1.7,.7,1.01), opacity .3s;
+      pointer-events: auto;
+      transform-origin: left top;
+      margin-top: 16px;
+    }
+    
+    .cta-btn:hover {
+      background: #ffe98a;
+    }
+    
+    .cta-btn:focus {
+      outline: 2px solid #ffd65a;
+      outline-offset: 2px;
+    }
+    
+    .cta-btn.falling {
+      animation: fall-off-hinge 2.2s cubic-bezier(.6,1.7,.7,1.01) forwards;
+    }
+    
+    @keyframes fall-off-hinge {
+      0% { transform: rotate(0deg) translateY(0); opacity: 1; }
+      10% { transform: rotate(-18deg) translateY(0); }
+      20% { transform: rotate(12deg) translateY(0); }
+      30% { transform: rotate(-8deg) translateY(0); }
+      40% { transform: rotate(6deg) translateY(0); }
+      50% { transform: rotate(-4deg) translateY(0); }
+      60% { transform: rotate(2deg) translateY(0); }
+      70% { transform: rotate(-1deg) translateY(0); }
+      80% { transform: rotate(0deg) translateY(0); opacity: 1; }
+      85% { transform: rotate(0deg) translateY(40vh) scale(1.05); opacity: 1; }
+      92% { transform: rotate(12deg) translateY(80vh) scale(1.08); opacity: 1; }
+      100% { transform: rotate(18deg) translateY(140vh) scale(1.1); opacity: 0.7; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cta-btn.falling {
+        animation: none;
+        opacity: 0;
+      }
+    }
+    
+    .hint {
+      position: fixed; left: 12px; top: 12px;
+      font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255,255,255,.8);
+      background: rgba(0,0,0,.35);
+      padding: 8px 10px;
+      border-radius: 10px;
+      backdrop-filter: blur(8px);
+      user-select: none;
+      z-index: 3;
+      opacity: 1;
+      transition: opacity 0.6s ease-out;
+    }
+
+    .hint.fade-out {
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .first-load-cue {
+      position: fixed;
+      left: 15%;
+      top: 50%;
+      width: 128px;
+      height: 128px;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 2px solid rgba(255, 214, 90, 0.4);
+      border-radius: 50%;
+      animation: pulse-animation 2.5s ease-out forwards;
+    }
+
+    @keyframes pulse-animation {
+      0% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+      100% {
+        transform: scale(2.5);
+        opacity: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-ring {
+        animation: none;
+        opacity: 0;
+      }
+    }
+    
+    .floating-word {
+      position: fixed;
+      font: bold 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .control-btn {
+      font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #0b0b0f;
+      background: #ffd65a;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      user-select: none;
+    }
+
+    .control-btn:hover {
+      background: #ffe98a;
+    }
+
+    .control-btn:focus {
+      outline: 2px solid #ffd65a;
+      outline-offset: 1px;
+    }
+
+    .toggle-switch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-switch label {
+      font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 214, 90, 0.2);
+      transition: background-color 0.2s;
+      border-radius: 20px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: #ffd65a;
+      transition: transform 0.2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: rgba(255, 214, 90, 0.5);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+
+    
+    /* How I Help Section */
+    .how-i-help {
+      position: relative;
+      z-index: 2;
+      padding: 80px 20px;
+      background: linear-gradient(180deg, rgba(11,11,15,0) 0%, rgba(11,11,15,0.95) 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .how-i-help h2 {
+      font: bold 36px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      margin-bottom: 60px;
+      text-align: center;
+    }
+
+    .skills-intro {
+      font: 22px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #fff;
+      max-width: 600px;
+      text-align: center;
+      margin-bottom: 60px;
+      background: rgba(0,0,0,.35);
+      padding: 20px 30px;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+    }
+    
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      width: 100%;
+    }
+    
+    .card {
+      background: rgba(255, 214, 90, 0.05);
+      border: 1px solid rgba(255, 214, 90, 0.2);
+      border-radius: 12px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      border-color: rgba(255, 214, 90, 0.4);
+      background: rgba(255, 214, 90, 0.08);
+      transform: translateY(-4px);
+    }
+    
+    .card h3 {
+      font: bold 18px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      margin: 0 0 12px 0;
+    }
+    
+    .card p {
+      font: 15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255,255,255,0.85);
+      margin: 0 0 8px 0;
+    }
+
+    .card-example {
+      font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 214, 90, 0.8);
+      margin: 0;
+      font-style: italic;
+    }
+    
+    .card-icon {
+      position: absolute;
+      top: -20px;
+      right: -20px;
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 214, 90, 0.1);
+      border-radius: 50%;
+      transition: all 0.4s ease;
+    }
+    
+    .card:hover .card-icon {
+      width: 120px;
+      height: 120px;
+      top: -40px;
+      right: -40px;
+      background: rgba(255, 214, 90, 0.15);
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      .card {
+        transition: none;
+      }
+      .card:hover {
+        transform: none;
+      }
+      .card-icon {
+        transition: none;
+      }
+    }
+
+    /* Selected Work Section */
+    .selected-work {
+      position: relative;
+      z-index: 2;
+      padding: 80px 20px;
+      background: rgba(11, 11, 15, 0.5);
+      min-height: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .selected-work h2 {
+      font: bold 36px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      margin-bottom: 60px;
+      text-align: center;
+    }
+
+    .work-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .work-item {
+      background: rgba(255, 214, 90, 0.03);
+      border: 1px solid rgba(255, 214, 90, 0.15);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .work-item:hover {
+      border-color: rgba(255, 214, 90, 0.3);
+      background: rgba(255, 214, 90, 0.06);
+    }
+
+    .work-item h3 {
+      font: bold 16px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      margin: 0 0 8px 0;
+    }
+
+    .work-outcome {
+      font: 14px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0 0 16px 0;
+    }
+
+    .work-link {
+      font: bold 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #0b0b0f;
+      background: #ffd65a;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
+    .work-link:hover {
+      background: #ffe98a;
+      transform: translateY(-2px);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .work-item:hover {
+        transform: none;
+      }
+    }
+
+    /* People-First Section */
+    .people-first {
+      position: relative;
+      z-index: 2;
+      padding: 60px 20px;
+      background: rgba(255, 214, 90, 0.02);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .people-first h2 {
+      font: bold 28px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .people-first-content {
+      max-width: 700px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 28px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 214, 90, 0.1);
+    }
+
+    .people-first-content p {
+      font: 16px/1.7 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 255, 255, 0.9);
+      margin: 0 0 16px 0;
+    }
+
+    .people-first-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .people-bullets {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0 0 0;
+    }
+
+    .people-bullets li {
+      font: 15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(255, 255, 255, 0.85);
+      padding-left: 24px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .people-bullets li:before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #ffd65a;
+      font-weight: bold;
+    }
+
+    
+    /* Contact Section */
+    #contact {
+      height: auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0b0b0f;
+      padding: 60px 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .contact-promise {
+      font: bold 18px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #ffd65a;
+      max-width: 600px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    
+    #contact img {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(255, 214, 90, 0.2);
+      margin-bottom: 40px;
+    }
+    
+    .contact-blurb {
+      font: 20px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #fff;
+      max-width: 600px;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    
+    .contact-actions {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .contact-btn {
+      font: bold 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: #0b0b0f;
+      background: #ffd65a;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 28px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+    
+    .contact-btn:hover {
+      background: #ffe98a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 214, 90, 0.3);
+    }
+    
+    .contact-btn:focus {
+      outline: 2px solid #ffd65a;
+      outline-offset: 2px;
+    }
+    
+    @media (prefers-reduced-motion: reduce) {
+      .contact-btn:hover {
+        transform: none;
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .agency-title {
+        font-size: 36px;
+      }
+
+      .hero-tagline {
+        font-size: 18px;
+      }
+
+      .how-i-help h2,
+      .selected-work h2,
+      .people-first h2 {
+        font-size: 28px;
+        margin-bottom: 40px;
+      }
+
+      .cards-grid,
+      .work-grid {
+        gap: 16px;
+      }
+
+      .controls-panel {
+        flex-direction: column;
+        bottom: 16px;
+        right: 16px;
+        gap: 8px;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  
+  <!-- First-load pulse cue (visible only on load) -->
+  <div class="first-load-cue">
+    <div class="pulse-ring"></div>
+  </div>
+
+  <div class="overlay">
+    <div class="hero-content">
+      <div class="agency-title">Mitosis Creative Agency</div>
+      <div class="hero-tagline">We split big, messy ideas into experiences people actually feel.</div>
+      <div class="value-chips">
+        <div class="chip">Interpreter</div>
+        <div class="chip">Rapid belief prototypes</div>
+        <div class="chip">Participation loops</div>
+        <div class="chip">Human-first AI</div>
+      </div>
+      <button class="cta-btn" id="ctaBtn">Let's Work Together</button>
+    </div>
+  </div>
+
+  <div class="hint" id="hint">Click to split an idea. Each generation gets more focused.</div>
+
+  <!-- How I Help Section -->
+  <div class="how-i-help">
+    <div class="skills-intro">
+      We split big, messy ideas into experiences people actually feel.
+    </div>
+    <h2>How I Help</h2>
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-icon"></div>
+        <h3>Interpreter</h3>
+        <p>I translate vague human emotions into interaction mechanics. Clarity first.</p>
+        <p class="card-example">Strategy → mechanic → prototype in a day.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon"></div>
+        <h3>Reality Generator</h3>
+        <p>Prototype fast. Make clients <em>feel</em> the idea before scaling it.</p>
+        <p class="card-example">Clickable demo before full build.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon"></div>
+        <h3>Creative Multiplier</h3>
+        <p>AI-assisted workflows that speed up teams without killing the soul.</p>
+        <p class="card-example">Automation that keeps taste human.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon"></div>
+        <h3>Human Guardrails</h3>
+        <p>Every system gets tested for empathy. Does this still feel human?</p>
+        <p class="card-example">Accessibility + clarity + consent.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selected Work Section -->
+  <div class="selected-work">
+    <h2>Selected Work</h2>
+    <div class="work-grid">
+      <div class="work-item">
+        <h3>Interactive Brand Strategy</h3>
+        <p class="work-outcome">Shifted user perception from corporate to human-forward through playful micro-interactions.</p>
+        <button class="work-link" onclick="alert('Case study coming soon'); return false;">View Project</button>
+      </div>
+      <div class="work-item">
+        <h3>Rapid Prototype Sprint</h3>
+        <p class="work-outcome">Validated concept in 5 days with clickable demo that convinced stakeholders before full build.</p>
+        <button class="work-link" onclick="alert('Case study coming soon'); return false;">View Project</button>
+      </div>
+      <div class="work-item">
+        <h3>AI Workflow Redesign</h3>
+        <p class="work-outcome">Automated repetitive tasks while preserving creative decision-making and human taste.</p>
+        <button class="work-link" onclick="alert('Case study coming soon'); return false;">View Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- People-First Section -->
+  <div class="people-first">
+    <h2>What It's Like to Work Together</h2>
+    <div class="people-first-content">
+      <p>I'm not here to execute your brief in a vacuum. I'm here to think alongside you, ask hard questions, and build things that feel alive.</p>
+      <ul class="people-bullets">
+        <li><strong>Rapid cycles:</strong> We test and iterate fast—no lengthy approval theater.</li>
+        <li><strong>Real feedback:</strong> You get honest input on what works, not just what I built.</li>
+        <li><strong>Human-first:</strong> Every feature asks: "Does this serve a real person?" first.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Contact Section -->
+  <div id="contact">
+    <div class="contact-promise">If you want the work to feel human and ship fast, let's build together.</div>
+    <img id="contactImage" src="./images/the_sky_is_blue_cover.jpg" alt="Creative work" />
+    <div class="contact-blurb">
+      Let's start a conversation about what you're building and what it needs to feel.
+    </div>
+    <div class="contact-actions">
+      <a href="mailto:hello@mitosiscreative.com" class="contact-btn">Start a Project</a>
+      <a href="https://calendly.com/placeholder" class="contact-btn" onclick="alert('Schedule link: use your actual Calendly URL here'); return false;">Talk It Through</a>
+    </div>
+  </div>
+
+  <!-- Controls Panel -->
+  <div class="controls-panel">
+    <button class="control-btn" id="resetBtn" title="Reset the cell system">Reset</button>
+    <div class="toggle-switch">
+      <label for="calmToggle">Calm Mode</label>
+      <label class="switch">
+        <input type="checkbox" id="calmToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    
+    let calmModeActive = prefersReducedMotion; // Start in calm mode if user prefers reduced motion
+    let hasFirstSplit = false;
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(innerWidth * dpr);
+      canvas.height = Math.floor(innerHeight * dpr);
+      canvas.style.width = innerWidth + 'px';
+      canvas.style.height = innerHeight + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const cells = [];
+    const splits = [];
+    const floatingWords = ['clarity', 'empathy', 'prototype', 'participation', 'taste', 'momentum'];
+
+    let SHRINK = 0.78;
+    let SEP = 1.15;
+    let SPLIT_MS = 520;
+    let DRAG = 0.992;
+    let JIGGLE = prefersReducedMotion ? 0.01 : 0.06;
+
+    function updatePhysicsParams() {
+      if (calmModeActive) {
+        JIGGLE = 0.01;
+      } else {
+        JIGGLE = prefersReducedMotion ? 0.01 : 0.06;
+      }
+    }
+
+    function addCell(x, y, r) {
+      cells.push({
+        x: x,
+        y: y,
+        r: r,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.6
+      });
+    }
+
+    // Start with one happy face cell
+    addCell(innerWidth * 0.15, innerHeight / 2, 64);
+
+    function resetCells() {
+      cells.length = 0;
+      splits.length = 0;
+      hasFirstSplit = false;
+      addCell(innerWidth * 0.15, innerHeight / 2, 64);
+      
+      // Show hint again on reset
+      const hint = document.getElementById('hint');
+      if (hint) {
+        hint.classList.remove('fade-out');
+      }
+    }
+
+    function pickCell(clickX, clickY) {
+      let closest = null;
+      let minDist = Infinity;
+      for (let cell of cells) {
+        const dist = Math.hypot(cell.x - clickX, cell.y - clickY);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = cell;
+        }
+      }
+      return closest;
+    }
+
+    function startSplit(cell) {
+      if (!cell) return;
+      const i = cells.indexOf(cell);
+      if (i === -1) return;
+
+      cells.splice(i, 1);
+
+      const angle = Math.random() * Math.PI * 2;
+      const sep = cell.r * SEP;
+      const newR = cell.r * SHRINK;
+      const speed = 1.5;
+
+      const c1 = {
+        x: cell.x + Math.cos(angle) * sep,
+        y: cell.y + Math.sin(angle) * sep,
+        r: newR,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed
+      };
+
+      const c2 = {
+        x: cell.x - Math.cos(angle) * sep,
+        y: cell.y - Math.sin(angle) * sep,
+        r: newR,
+        vx: -Math.cos(angle) * speed,
+        vy: -Math.sin(angle) * speed
+      };
+
+      splits.push({
+        start: Date.now(),
+        c1a: { x: cell.x, y: cell.y },
+        c1b: c1,
+        c2a: { x: cell.x, y: cell.y },
+        c2b: c2
+      });
+
+      cells.push(c1, c2);
+
+      // Fade out hint after first split
+      if (!hasFirstSplit) {
+        hasFirstSplit = true;
+        const hint = document.getElementById('hint');
+        if (hint) {
+          setTimeout(() => {
+            hint.classList.add('fade-out');
+          }, 500);
+        }
+      }
+
+      // Floating word (1 in 5 chance, skip if calm mode)
+      if (Math.random() < 0.2 && !prefersReducedMotion && !calmModeActive) {
+        const word = floatingWords[Math.floor(Math.random() * floatingWords.length)];
+        const el = document.createElement('div');
+        el.className = 'floating-word';
+        el.textContent = word;
+        el.style.left = cell.x + 'px';
+        el.style.top = cell.y + 'px';
+        el.style.opacity = '1';
+        el.style.transition = 'opacity 0.5s ease-out, transform 1.5s ease-out';
+        document.body.appendChild(el);
+
+        requestAnimationFrame(() => {
+          el.style.transform = 'translateY(-40px)';
+          el.style.opacity = '0';
+        });
+
+        setTimeout(() => el.remove(), 1500);
+      }
+    }
+
+    function drawFace(x, y, r, pinch = 0) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Face
+      ctx.fillStyle = '#ffd65a';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Left eye
+      ctx.fillStyle = '#0b0b0f';
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.25, r * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Right eye
+      ctx.beginPath();
+      ctx.arc(r * 0.35, -r * 0.25, r * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Smile
+      ctx.strokeStyle = '#0b0b0f';
+      ctx.lineWidth = r * 0.12;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.1, r * 0.3, 0, Math.PI, false);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function step(now) {
+      ctx.fillStyle = 'rgba(11, 11, 15, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Update splits
+      for (let i = splits.length - 1; i >= 0; i--) {
+        const s = splits[i];
+        const elapsed = now - s.start;
+        const progress = Math.min(1, elapsed / SPLIT_MS);
+
+        const c1x = s.c1a.x + (s.c1b.x - s.c1a.x) * progress;
+        const c1y = s.c1a.y + (s.c1b.y - s.c1a.y) * progress;
+        const c2x = s.c2a.x + (s.c2b.x - s.c2a.x) * progress;
+        const c2y = s.c2a.y + (s.c2b.y - s.c2a.y) * progress;
+
+        drawFace(c1x, c1y, s.c1b.r);
+        drawFace(c2x, c2y, s.c2b.r);
+
+        if (progress >= 1) {
+          splits.splice(i, 1);
+        }
+      }
+
+      // Update and draw cells
+      for (let cell of cells) {
+        cell.vx *= DRAG;
+        cell.vy *= DRAG;
+        cell.vx += (Math.random() - 0.5) * JIGGLE;
+        cell.vy += (Math.random() - 0.5) * JIGGLE;
+
+        cell.x += cell.vx;
+        cell.y += cell.vy;
+
+        // Bounce off edges
+        if (cell.x - cell.r < 0) {
+          cell.x = cell.r;
+          cell.vx = Math.abs(cell.vx) * 0.6;
+        }
+        if (cell.x + cell.r > innerWidth) {
+          cell.x = innerWidth - cell.r;
+          cell.vx = -Math.abs(cell.vx) * 0.6;
+        }
+        if (cell.y - cell.r < 0) {
+          cell.y = cell.r;
+          cell.vy = Math.abs(cell.vy) * 0.6;
+        }
+        if (cell.y + cell.r > innerHeight) {
+          cell.y = innerHeight - cell.r;
+          cell.vy = -Math.abs(cell.vy) * 0.6;
+        }
+
+        drawFace(cell.x, cell.y, cell.r);
+      }
+
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    // Click handler
+    window.addEventListener('pointerdown', (e) => {
+      const cell = pickCell(e.clientX, e.clientY);
+      if (cell) {
+        startSplit(cell);
+      }
+    });
+
+    // CTA button
+    const ctaBtn = document.getElementById('ctaBtn');
+    ctaBtn.addEventListener('click', function(e) {
+      if (!calmModeActive || !prefersReducedMotion) {
+        ctaBtn.classList.add('falling');
+      }
+      setTimeout(() => {
+        document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+      }, calmModeActive ? 300 : 2000);
+    });
+
+    // Reset button
+    const resetBtn = document.getElementById('resetBtn');
+    resetBtn.addEventListener('click', resetCells);
+
+    // Calm mode toggle
+    const calmToggle = document.getElementById('calmToggle');
+    if (prefersReducedMotion) {
+      calmToggle.checked = true;
+    }
+    
+    calmToggle.addEventListener('change', (e) => {
+      calmModeActive = e.target.checked;
+      updatePhysicsParams();
+    });
+
+    // Remove first-load cue after animation
+    setTimeout(() => {
+      const cue = document.querySelector('.first-load-cue');
+      if (cue) {
+        cue.style.display = 'none';
+      }
+    }, 3000);
+  </script>
+</body>
+</html>
