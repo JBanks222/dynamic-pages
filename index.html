@@ -1,532 +1,511 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Humans&-ish Particles (Auto-Tuned Airy+Solid)</title>
+  <title>Logo Particles – Recall Loop</title>
   <style>
-    html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#0b0b0f; }
-    canvas { display:block; position:fixed; inset:0; width:100%; height:100%; }
-
-    .ui {
-      position:fixed; top:12px; right:12px; z-index:5;
-      display:flex; gap:8px;
-      font:13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      user-select:none;
-    }
-    .btn{
-      border:0; border-radius:10px;
-      padding:9px 12px; cursor:pointer;
-      background:#ffd65a; color:#0b0b0f;
-    }
-    .btn.secondary{
-      background:rgba(255,255,255,.14);
-      color:rgba(255,255,255,.9);
-      border:1px solid rgba(255,255,255,.16);
-    }
-    .label{
-      position:fixed; left:12px; top:12px; z-index:5;
-      font:13px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      color:rgba(255,255,255,.82);
+    html, body { margin:0; height:100%; background:#0b0d12; overflow:hidden; }
+    canvas { display:block; width:100vw; height:100vh; }
+    .hud{
+      position:fixed; left:12px; top:12px; z-index:10;
+      font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      color:rgba(255,255,255,.85);
       background:rgba(0,0,0,.35);
-      padding:8px 10px; border-radius:12px;
-      backdrop-filter: blur(10px);
-      max-width:min(92vw, 980px);
+      padding:10px 12px; border:1px solid rgba(255,255,255,.12);
+      border-radius:10px; backdrop-filter: blur(6px);
+      max-width: 420px;
     }
-    .label small { opacity:.75; }
+    .hud b{ color:#fff; }
+    .hud .row{ margin-top:6px; opacity:.9; }
+    .hud code{ color:#b9d4ff; }
   </style>
 </head>
 <body>
+  <div class="hud">
+    <div><b>Logo Particles – Recall Loop</b></div>
+    <div class="row">Keys: <code>R</code> rebuild mask, <code>Space</code> pause, <code>Mouse</code> swirl attract</div>
+    <div class="row">Edit at top: <code>LOGO_TEXT</code>, particle count, timing, strengths.</div>
+  </div>
   <canvas id="c"></canvas>
 
-  <div class="label" id="label">
-    Humans&-ish particles seeded inside a bold <b>&amp;&amp;&amp;</b> mask with interpersonal aura + torus flow.
-    Density is auto-tuned to stay “airy + solid” across screen sizes.
-    <small>Toggle Guide to see the mask. Repulsion affects dissimilar “tribes”.</small>
-  </div>
-
-  <div class="ui">
-    <button class="btn secondary" id="repelBtn">Repulsion: On</button>
-    <button class="btn secondary" id="guideBtn">Guide: Off</button>
-    <button class="btn" id="resetBtn">Reset</button>
-  </div>
-
 <script>
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d', { alpha:false });
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* ===========================
+   CONFIG (edit these)
+=========================== */
+const CONFIG = {
+  LOGO_TEXT: "Just some people",          // try: "Humans&", "&&&", etc.
+  FONT_FAMILY: "Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial",
+  FONT_WEIGHT: 800,
+  // Sampling controls (higher = fewer particles, lower = more)
+  SAMPLE_STEP: 4,            // px step when sampling mask (3–7 typical)
+  TARGET_PARTICLES: 3600,    // will try to get close to this count
 
-  // ====== MASK TEXT ======
-  const LOGO_TEXT = "just some people";
-  // =======================
+  // Particle appearance
+  PARTICLE_RADIUS: 1.45,
+  PARTICLE_ALPHA: 0.85,
 
-  // --- Visual ---
-  const BG_FADE = 0.18;       // higher = faster fade = fewer streaks
-  let DOT_R = 2.0;            // auto-tuned in seed()
-  const MAX_DPR = 2;
+  // Free physics
+  FLOW_STRENGTH: 0.65,       // 0..2
+  FLOW_SCALE: 0.0032,        // noise scale
+  DRAG: 0.985,               // velocity damping
+  SPEED_LIMIT: 3.25,
 
-  // --- Mask sampling ---
-  const MASK_ALPHA = 55;
-  const SAMPLE_STRIDE = 2;    // higher resolution for ampersand loops
-  const MASK_CELL = 26;
+  // Particle-to-particle separation (reduce “ropes”)
+  SEPARATION: true,
+  SEP_RADIUS: 10,            // interaction radius
+  SEP_STRENGTH: 0.18,        // 0..1
 
-  // Gentle tether: keeps wordmark coherent
-  const MASK_TETHER = 0.040;
-  const MASK_FALLOFF = 0.020;
+  // Soft boundary around the whole logo mask (keeps them near the mark)
+  MASK_BOUNDARY: true,
+  MASK_BOUNDARY_STRENGTH: 0.06, // 0..0.3
 
-  // --- Boundary around the mask (flow-friendly containment) ---
-  const BOUNDARY_WIDTH = 18;    // distance (px) from nearest hub considered "inside enough"
-  const BOUNDARY_FORCE = 0.045; // gentle inward correction (no slamming)
-  const EDGE_SLIDE = 0.28;      // tangential assist along edges (preserves swirl)
+  // Loop timing (seconds)
+  LOOP: {
+    FREE: 2.6,
+    RECALL: 1.3,
+    HOLD: 0.55,
+    RELEASE: 0.55,
+  },
 
-  // --- Social dynamics ---
-  const NEI_R = 26;
-  const NEI_R2 = NEI_R * NEI_R;
+  // Recall behavior
+  RECALL_STRENGTH: 0.030,    // spring strength to home
+  RECALL_DAMP: 0.86,         // additional damping during recall
+  HOLD_LERP: 0.30,           // snap-to-home during hold
 
-  const DRAG = 0.988;
-  const JITTER = prefersReducedMotion ? 0.02 : 0.038;
+  // Release burst
+  RELEASE_BURST: 1.4,        // add random + outward velocity
+  RELEASE_OUTWARD: 0.9,      // outward from center
 
-  const ALIGN = 0.008;       // low alignment reduces filaments
-  const COHESION = 0.028;    // centroid cohesion produces “blobs”
-  const SEPARATION = 0.012;  // weak macro separation; aura does micro spacing
-  const REPULSE = 0.018;     // dissimilar repulsion (toggle)
+  // Mouse swirl
+  MOUSE_SWIRL: true,
+  MOUSE_STRENGTH: 1.25,
+  MOUSE_RADIUS: 220,
+};
 
-  // similarity weight strength
-  const SIM_K = 6.0;
+/* ===========================
+   CANVAS SETUP
+=========================== */
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: true });
 
-  // --- Humans& interpersonal aura (soft personal bubble) ---
-  // These are slightly tuned dynamically based on density in seed()
-  let AURA_RADIUS = 6.2;
-  let AURA_FORCE = 0.032;
+let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = Math.floor(window.innerWidth);
+  H = Math.floor(window.innerHeight);
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  buildMaskAndParticles();
+}
+window.addEventListener("resize", resize);
 
-  // --- Global torus flow (stable spiral / donut circulation) ---
-  const FLOW_SWIRL = 0.018;      // around-center orbital drift
-  const FLOW_POLAR = 0.010;      // in/out circulation (through donut)
-  const FLOW_FREQ = 2.0;         // “donut” character
-  const FLOW_SPEED = 0.85;       // time speed
-  const FLOW_TANGENT_MIX = 0.35; // poloidal tangent component
+/* ===========================
+   SIMPLE 2D NOISE (fast)
+=========================== */
+function hash(n){ return (Math.sin(n) * 43758.5453123) % 1; }
+function noise2(x,y){
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const n00 = hash((xi*15731 + yi*789221) | 0);
+  const n10 = hash(((xi+1)*15731 + yi*789221) | 0);
+  const n01 = hash((xi*15731 + (yi+1)*789221) | 0);
+  const n11 = hash(((xi+1)*15731 + (yi+1)*789221) | 0);
+  const u = xf*xf*(3-2*xf);
+  const v = yf*yf*(3-2*yf);
+  const x1 = n00*(1-u) + n10*u;
+  const x2 = n01*(1-u) + n11*u;
+  return x1*(1-v) + x2*v;
+}
 
-  // --- Fake 3D depth (subtle) ---
-  const DEPTH_STRENGTH = 0.55;   // dot radius changes with depth
+/* ===========================
+   MASK BUILD (text -> points)
+=========================== */
+let particles = [];
+let maskBounds = { minX:0, minY:0, maxX:0, maxY:0, cx:0, cy:0 };
 
-  // --- Auto-tune density (airy + solid) ---
-  const TARGET_COVERAGE = 0.84;  // 0.80–0.86 = airy+solid balance
-  const DOT_R_MIN = 1.7;
-  const DOT_R_MAX = 2.2;
-  const N_MIN = 1800;
-  const N_MAX = 5200;
+function buildMaskAndParticles(){
+  // offscreen canvas to rasterize text
+  const off = document.createElement("canvas");
+  const octx = off.getContext("2d");
+  off.width = Math.floor(W);
+  off.height = Math.floor(H);
 
-  let W = 0, H = 0, dpr = 1;
+  // choose font size based on viewport
+  const base = Math.min(W, H);
+  const fontSize = Math.max(96, Math.floor(base * 0.22));
+  octx.clearRect(0,0,off.width,off.height);
+  octx.fillStyle = "#fff";
+  octx.textAlign = "center";
+  octx.textBaseline = "middle";
+  octx.font = `${CONFIG.FONT_WEIGHT} ${fontSize}px ${CONFIG.FONT_FAMILY}`;
 
-  let hubs = [];
-  let maskArea = 0;        // approximate mask area in px^2 (from sampling)
-  let guideCanvas = null;
-  const hubGrid = new Map();
+  // draw centered
+  const x0 = off.width/2;
+  const y0 = off.height/2;
+  octx.fillText(CONFIG.LOGO_TEXT, x0, y0);
 
-  const agents = [];
-  const neiGrid = new Map();
+  // read pixels and sample mask points
+  const img = octx.getImageData(0,0,off.width,off.height);
+  const data = img.data;
 
-  let repulsionOn = true;
-  let showGuide = false;
+  const step = CONFIG.SAMPLE_STEP;
+  const pts = [];
+  let minX=1e9, minY=1e9, maxX=-1e9, maxY=-1e9;
 
-  function gridKey(x, y, cell) {
-    return `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
-  }
-
-  function clearFrame() {
-    ctx.fillStyle = "#0b0b0f";
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  function buildMask() {
-    const off = document.createElement('canvas');
-    off.width = W;
-    off.height = H;
-    const o = off.getContext('2d');
-
-    o.clearRect(0, 0, W, H);
-    o.fillStyle = "#fff";
-    o.textAlign = "center";
-    o.textBaseline = "middle";
-
-    const baseSize = Math.max(72, Math.min(210, W * 0.20));
-    o.font = `900 ${baseSize * 1.08}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-    o.fillText(LOGO_TEXT, W * 0.5, H * 0.52);
-
-    const img = o.getImageData(0, 0, W, H).data;
-
-    hubs = [];
-    let maskAreaApprox = 0;
-
-    for (let y = 0; y < H; y += SAMPLE_STRIDE) {
-      for (let x = 0; x < W; x += SAMPLE_STRIDE) {
-        const a = img[(y * W + x) * 4 + 3];
-        if (a > MASK_ALPHA) {
-          hubs.push({ x, y });
-          maskAreaApprox += (SAMPLE_STRIDE * SAMPLE_STRIDE);
-        }
-      }
-    }
-
-    maskArea = maskAreaApprox;
-
-    hubGrid.clear();
-    for (const p of hubs) {
-      const k = gridKey(p.x, p.y, MASK_CELL);
-      const bucket = hubGrid.get(k);
-      if (bucket) bucket.push(p);
-      else hubGrid.set(k, [p]);
-    }
-
-    guideCanvas = off;
-  }
-
-  function findNearestHub(x, y) {
-    if (!hubs.length) return null;
-
-    const cx = Math.floor(x / MASK_CELL);
-    const cy = Math.floor(y / MASK_CELL);
-
-    let best = null;
-    let bestD2 = Infinity;
-
-    for (let gy = cy - 2; gy <= cy + 2; gy++) {
-      for (let gx = cx - 2; gx <= cx + 2; gx++) {
-        const bucket = hubGrid.get(`${gx},${gy}`);
-        if (!bucket) continue;
-        for (const p of bucket) {
-          const dx = p.x - x;
-          const dy = p.y - y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < bestD2) {
-            bestD2 = d2;
-            best = p;
-          }
-        }
-      }
-    }
-    return best;
-  }
-
-  function seed() {
-    agents.length = 0;
-    if (!hubs.length || maskArea <= 0) return;
-
-    // --- Auto-tune DOT_R and N for airy+solid coverage ---
-    const screenScale = Math.min(1.15, Math.max(0.9, (W * H) / (1100 * 700)));
-    DOT_R = Math.max(DOT_R_MIN, Math.min(DOT_R_MAX, 1.9 * screenScale));
-
-    const dotArea = Math.PI * DOT_R * DOT_R;
-    let desiredN = Math.round((TARGET_COVERAGE * maskArea) / dotArea);
-
-    desiredN = Math.max(N_MIN, Math.min(N_MAX, desiredN));
-    desiredN = Math.min(desiredN, Math.floor(hubs.length * 0.92)); // keep some breathing room
-
-    // Relax aura slightly if density rises (prevents “packed” look)
-    const density = desiredN / 2800;
-    AURA_RADIUS = 6.2 - Math.max(0, density - 1) * 0.6; // down to ~5.6
-    AURA_FORCE  = 0.032 - Math.max(0, density - 1) * 0.006; // down to ~0.026
-
-    // expose for debugging if you want
-    window.__TUNED_N = desiredN;
-    window.__DOT_R = DOT_R;
-
-    const n = Math.min(desiredN, hubs.length);
-
-    for (let i = 0; i < n; i++) {
-      const p = hubs[(Math.random() * hubs.length) | 0];
-      agents.push({
-        x: p.x + (Math.random() - 0.5) * 2,
-        y: p.y + (Math.random() - 0.5) * 2,
-        vx: (Math.random() - 0.5) * 0.18,
-        vy: (Math.random() - 0.5) * 0.18,
-        t: Math.random(),
-        hub: p,
-        z: Math.random()
-      });
-    }
-  }
-
-  // Neighbor grid
-  function rebuildNeighbors() {
-    neiGrid.clear();
-    for (const a of agents) {
-      const k = gridKey(a.x, a.y, NEI_R);
-      const bucket = neiGrid.get(k);
-      if (bucket) bucket.push(a);
-      else neiGrid.set(k, [a]);
-    }
-  }
-
-  function neighbors(a, fn) {
-    const cx = Math.floor(a.x / NEI_R);
-    const cy = Math.floor(a.y / NEI_R);
-
-    for (let gy = cy - 1; gy <= cy + 1; gy++) {
-      for (let gx = cx - 1; gx <= cx + 1; gx++) {
-        const bucket = neiGrid.get(`${gx},${gy}`);
-        if (!bucket) continue;
-
-        for (const b of bucket) {
-          if (b === a) continue;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 <= NEI_R2) fn(b, dx, dy, Math.sqrt(d2));
-        }
+  // First pass: gather all candidate points
+  for(let y=0; y<off.height; y+=step){
+    for(let x=0; x<off.width; x+=step){
+      const i = (y*off.width + x)*4 + 3; // alpha
+      const a = data[i];
+      if(a > 50){
+        pts.push({x, y});
+        if(x<minX) minX=x;
+        if(y<minY) minY=y;
+        if(x>maxX) maxX=x;
+        if(y>maxY) maxY=y;
       }
     }
   }
-
-  function smoothstep01(t) {
-    return t * t * (3 - 2 * t);
+  if(!pts.length){
+    particles = [];
+    return;
   }
 
-  // Global torus-like flow field + subtle fake depth
-  function addTorusFlow(a) {
-    const cx = W * 0.5;
-    const cy = H * 0.52;
+  maskBounds = {
+    minX, minY, maxX, maxY,
+    cx: (minX+maxX)/2,
+    cy: (minY+maxY)/2
+  };
 
-    const dx = a.x - cx;
-    const dy = a.y - cy;
-
-    const r = Math.hypot(dx, dy) || 1;
-    const nx = dx / r;
-    const ny = dy / r;
-
-    // tangent for orbit swirl
-    const tx = -ny;
-    const ty = nx;
-
-    const angle = Math.atan2(dy, dx);
-    const time = performance.now() * 0.001;
-
-    // torus phase: angle + time + trait offset
-    const phase = time * FLOW_SPEED + angle * FLOW_FREQ + a.t * Math.PI * 2;
-
-    // poloidal: in/out + slight tangent
-    const pr = Math.sin(phase);
-    const pt = Math.cos(phase) * FLOW_TANGENT_MIX;
-
-    a.vx += tx * FLOW_SWIRL + nx * (pr * FLOW_POLAR) + tx * (pt * FLOW_POLAR);
-    a.vy += ty * FLOW_SWIRL + ny * (pr * FLOW_POLAR) + ty * (pt * FLOW_POLAR);
-
-    // depth cue synced with phase
-    a.z = 0.5 + 0.5 * Math.sin(phase);
+  // Downsample/upsample to TARGET_PARTICLES
+  let homes = pts;
+  const target = CONFIG.TARGET_PARTICLES;
+  if(homes.length > target){
+    // random pick
+    const picked = [];
+    for(let i=0;i<target;i++){
+      const j = (Math.random()*homes.length) | 0;
+      picked.push(homes[j]);
+    }
+    homes = picked;
+  } else if(homes.length < target){
+    // duplicate with jitter
+    const expanded = homes.slice();
+    while(expanded.length < target){
+      const p = homes[(Math.random()*homes.length)|0];
+      expanded.push({ x: p.x + (Math.random()-0.5)*step, y: p.y + (Math.random()-0.5)*step });
+    }
+    homes = expanded;
   }
 
-  function update() {
-    rebuildNeighbors();
+  // Create particles with home position AND current position initially at home
+  particles = homes.map((p, idx) => ({
+    id: idx,
+    homeX: p.x,
+    homeY: p.y,
+    x: p.x,
+    y: p.y,
+    vx: (Math.random()-0.5)*0.2,
+    vy: (Math.random()-0.5)*0.2,
+    r: CONFIG.PARTICLE_RADIUS * (0.85 + Math.random()*0.3),
+  }));
+}
 
-    for (const a of agents) {
-      // base motion
-      a.vx *= DRAG;
-      a.vy *= DRAG;
+/* ===========================
+   LOOP STATE MACHINE
+=========================== */
+const modes = { FREE:0, RECALL:1, HOLD:2, RELEASE:3 };
+let mode = modes.FREE;
+let t = 0;
+let loopTotal = CONFIG.LOOP.FREE + CONFIG.LOOP.RECALL + CONFIG.LOOP.HOLD + CONFIG.LOOP.RELEASE;
 
-      a.vx += (Math.random() - 0.5) * JITTER;
-      a.vy += (Math.random() - 0.5) * JITTER;
+function updateMode(dt){
+  t += dt;
+  if(t >= loopTotal) t -= loopTotal;
 
-      // global spiral / torus flow
-      addTorusFlow(a);
+  const a = CONFIG.LOOP.FREE;
+  const b = a + CONFIG.LOOP.RECALL;
+  const c = b + CONFIG.LOOP.HOLD;
+  const d = c + CONFIG.LOOP.RELEASE;
 
-      // forces
-      let ax = 0, ay = 0;
+  if(t < a) mode = modes.FREE;
+  else if(t < b) mode = modes.RECALL;
+  else if(t < c) mode = modes.HOLD;
+  else mode = modes.RELEASE;
+}
 
-      // alignment + centroid cohesion
-      let avx = 0, avy = 0, vCount = 0;
-      let cx = 0, cy = 0, cCount = 0;
+/* ===========================
+   MOUSE
+=========================== */
+const mouse = { x:0, y:0, down:false, moved:false };
+window.addEventListener("pointermove", (e) => {
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.moved = true;
+});
+window.addEventListener("pointerdown", () => mouse.down = true);
+window.addEventListener("pointerup", () => mouse.down = false);
 
-      neighbors(a, (b, dx, dy, d) => {
-        const nx = dx / d;
-        const ny = dy / d;
-
-        const sim = Math.exp(-SIM_K * Math.abs(a.t - b.t));
-
-        // macro separation
-        const sep = SEPARATION / (1 + d * 0.25);
-        ax -= nx * sep;
-        ay -= ny * sep;
-
-        // interpersonal aura (soft bubble)
-        if (d < AURA_RADIUS) {
-          const t = 1 - (d / AURA_RADIUS);
-          const soft = smoothstep01(t);
-          const push = soft * AURA_FORCE;
-          ax -= nx * push;
-          ay -= ny * push;
-        }
-
-        // alignment among similar
-        avx += b.vx * sim;
-        avy += b.vy * sim;
-        vCount += sim;
-
-        // centroid cohesion among similar
-        cx += b.x * sim;
-        cy += b.y * sim;
-        cCount += sim;
-
-        // dissimilar repulsion (tribe separation)
-        if (repulsionOn) {
-          const dis = 1 - sim;
-          const rep = (dis * REPULSE) / (1 + d * 0.25);
-          ax -= nx * rep;
-          ay -= ny * rep;
-        }
-      });
-
-      if (vCount > 0.001) {
-        avx /= vCount;
-        avy /= vCount;
-        a.vx += (avx - a.vx) * ALIGN;
-        a.vy += (avy - a.vy) * ALIGN;
+/* ===========================
+   SPATIAL GRID for separation
+=========================== */
+let grid = null;
+function buildGrid(){
+  const cellSize = Math.max(6, CONFIG.SEP_RADIUS);
+  const cols = Math.ceil(W / cellSize);
+  const rows = Math.ceil(H / cellSize);
+  grid = { cellSize, cols, rows, cells: new Array(cols*rows) };
+  for(let i=0;i<grid.cells.length;i++) grid.cells[i] = [];
+  for(const p of particles){
+    const cx = Math.max(0, Math.min(cols-1, (p.x / cellSize) | 0));
+    const cy = Math.max(0, Math.min(rows-1, (p.y / cellSize) | 0));
+    grid.cells[cy*cols + cx].push(p);
+  }
+}
+function neighbors(p){
+  const { cellSize, cols, rows, cells } = grid;
+  const cx = Math.max(0, Math.min(cols-1, (p.x / cellSize) | 0));
+  const cy = Math.max(0, Math.min(rows-1, (p.y / cellSize) | 0));
+  const out = [];
+  for(let oy=-1; oy<=1; oy++){
+    for(let ox=-1; ox<=1; ox++){
+      const nx = cx+ox, ny = cy+oy;
+      if(nx>=0 && nx<cols && ny>=0 && ny<rows){
+        const bucket = cells[ny*cols + nx];
+        for(let i=0;i<bucket.length;i++) out.push(bucket[i]);
       }
+    }
+  }
+  return out;
+}
 
-      if (cCount > 0.001) {
-        cx /= cCount;
-        cy /= cCount;
-        const dx = cx - a.x;
-        const dy = cy - a.y;
-        const d = Math.hypot(dx, dy) || 1;
-        a.vx += (dx / d) * COHESION;
-        a.vy += (dy / d) * COHESION;
-      }
+/* ===========================
+   UPDATE PHYSICS
+=========================== */
+function clampSpeed(p){
+  const sp = Math.hypot(p.vx, p.vy);
+  if(sp > CONFIG.SPEED_LIMIT){
+    const s = CONFIG.SPEED_LIMIT / sp;
+    p.vx *= s; p.vy *= s;
+  }
+}
 
-      // --- Mask tether + flow-friendly boundary containment ---
-      if (!a.hub || Math.random() < 0.01) a.hub = findNearestHub(a.x, a.y);
+function applyMaskBoundary(p){
+  if(!CONFIG.MASK_BOUNDARY) return;
+  const pad = 6; // soft padding
+  const bx0 = maskBounds.minX - pad, by0 = maskBounds.minY - pad;
+  const bx1 = maskBounds.maxX + pad, by1 = maskBounds.maxY + pad;
+  let fx = 0, fy = 0;
 
-      if (a.hub) {
-        const dx = a.hub.x - a.x;
-        const dy = a.hub.y - a.y;
-        const dist = Math.hypot(dx, dy) || 0.0001;
-        const nx = dx / dist;
-        const ny = dy / dist;
+  if(p.x < bx0) fx += (bx0 - p.x);
+  else if(p.x > bx1) fx -= (p.x - bx1);
 
-        // gentle tether
-        const tether = MASK_TETHER / (1 + dist * MASK_FALLOFF);
-        ax += nx * tether;
-        ay += ny * tether;
+  if(p.y < by0) fy += (by0 - p.y);
+  else if(p.y > by1) fy -= (p.y - by1);
 
-        // boundary: cancel outward leakage but keep tangential swirl
-        if (dist > BOUNDARY_WIDTH) {
-          const over = dist - BOUNDARY_WIDTH;
+  p.vx += fx * CONFIG.MASK_BOUNDARY_STRENGTH;
+  p.vy += fy * CONFIG.MASK_BOUNDARY_STRENGTH;
+}
 
-          // If moving outward (away from hub), remove that component
-          const vDotN = a.vx * nx + a.vy * ny;
-          if (vDotN < 0) {
-            a.vx -= vDotN * nx;
-            a.vy -= vDotN * ny;
-          }
+function applySeparation(p){
+  if(!CONFIG.SEPARATION || !grid) return;
+  const neigh = neighbors(p);
+  const R = CONFIG.SEP_RADIUS;
+  const R2 = R*R;
+  let fx = 0, fy = 0, count = 0;
 
-          // gentle inward correction force
-          const push = over * BOUNDARY_FORCE;
-          ax += nx * push;
-          ay += ny * push;
+  for(const q of neigh){
+    if(q === p) continue;
+    const dx = p.x - q.x;
+    const dy = p.y - q.y;
+    const d2 = dx*dx + dy*dy;
+    if(d2 > 0 && d2 < R2){
+      const d = Math.sqrt(d2);
+      const s = (R - d) / R; // stronger when closer
+      fx += (dx / d) * s;
+      fy += (dy / d) * s;
+      count++;
+    }
+  }
+  if(count){
+    p.vx += (fx / count) * CONFIG.SEP_STRENGTH;
+    p.vy += (fy / count) * CONFIG.SEP_STRENGTH;
+  }
+}
 
-          // tiny tangential assist along boundary
-          const tx = -ny;
-          const ty = nx;
-          a.vx += tx * (EDGE_SLIDE * 0.01);
-          a.vy += ty * (EDGE_SLIDE * 0.01);
-        }
-      }
+function applyMouseSwirl(p){
+  if(!CONFIG.MOUSE_SWIRL || !mouse.moved) return;
+  const dx = p.x - mouse.x;
+  const dy = p.y - mouse.y;
+  const d = Math.hypot(dx, dy);
+  if(d < CONFIG.MOUSE_RADIUS){
+    // swirl: perpendicular force + mild attraction when mouse down
+    const t = 1 - (d / CONFIG.MOUSE_RADIUS);
+    const perpX = -dy / (d + 1e-6);
+    const perpY =  dx / (d + 1e-6);
+    const swirl = CONFIG.MOUSE_STRENGTH * t * 0.25;
+    p.vx += perpX * swirl;
+    p.vy += perpY * swirl;
 
-      // apply forces
-      a.vx += ax;
-      a.vy += ay;
+    if(mouse.down){
+      const attr = CONFIG.MOUSE_STRENGTH * t * 0.20;
+      p.vx += (-dx / (d + 1e-6)) * attr;
+      p.vy += (-dy / (d + 1e-6)) * attr;
+    }
+  }
+}
+
+function updateParticles(dt){
+  // separation grid only really needed during FREE/RELEASE
+  if(CONFIG.SEPARATION && (mode === modes.FREE || mode === modes.RELEASE)) buildGrid();
+
+  for(const p of particles){
+    if(mode === modes.FREE){
+      // flow field
+      const nx = p.x * CONFIG.FLOW_SCALE;
+      const ny = p.y * CONFIG.FLOW_SCALE;
+      const ang = noise2(nx, ny) * Math.PI * 2;
+      p.vx += Math.cos(ang) * CONFIG.FLOW_STRENGTH * 0.15;
+      p.vy += Math.sin(ang) * CONFIG.FLOW_STRENGTH * 0.15;
+
+      applySeparation(p);
+      applyMaskBoundary(p);
+      applyMouseSwirl(p);
 
       // integrate
-      a.x += a.vx;
-      a.y += a.vy;
+      p.vx *= Math.pow(CONFIG.DRAG, dt*60);
+      p.vy *= Math.pow(CONFIG.DRAG, dt*60);
+      clampSpeed(p);
+      p.x += p.vx * dt * 60;
+      p.y += p.vy * dt * 60;
 
-      // keep on screen (soft bounce)
-      if (a.x < 0) { a.x = 0; a.vx = Math.abs(a.vx) * 0.6; }
-      if (a.x > W) { a.x = W; a.vx = -Math.abs(a.vx) * 0.6; }
-      if (a.y < 0) { a.y = 0; a.vy = Math.abs(a.vy) * 0.6; }
-      if (a.y > H) { a.y = H; a.vy = -Math.abs(a.vy) * 0.6; }
+    } else if(mode === modes.RECALL){
+      // spring to home (smooth regroup)
+      const dx = p.homeX - p.x;
+      const dy = p.homeY - p.y;
+      p.vx += dx * CONFIG.RECALL_STRENGTH;
+      p.vy += dy * CONFIG.RECALL_STRENGTH;
+
+      // extra damping so they settle cleanly
+      p.vx *= CONFIG.RECALL_DAMP;
+      p.vy *= CONFIG.RECALL_DAMP;
+
+      clampSpeed(p);
+      p.x += p.vx * dt * 60;
+      p.y += p.vy * dt * 60;
+
+    } else if(mode === modes.HOLD){
+      // snap gently to home + kill velocity
+      p.x += (p.homeX - p.x) * CONFIG.HOLD_LERP;
+      p.y += (p.homeY - p.y) * CONFIG.HOLD_LERP;
+      p.vx *= 0.35;
+      p.vy *= 0.35;
+
+    } else if(mode === modes.RELEASE){
+      // one-time kick right as release starts (small window)
+      // We detect "first frames" of release by using t position in loop.
+      // Simple: apply small noise every frame but scaled.
+      const dxC = p.x - maskBounds.cx;
+      const dyC = p.y - maskBounds.cy;
+      const d = Math.hypot(dxC, dyC) + 1e-6;
+
+      // outward + random burst
+      const burst = CONFIG.RELEASE_BURST * 0.06;
+      p.vx += (dxC / d) * CONFIG.RELEASE_OUTWARD * burst;
+      p.vy += (dyC / d) * CONFIG.RELEASE_OUTWARD * burst;
+      p.vx += (Math.random()-0.5) * burst;
+      p.vy += (Math.random()-0.5) * burst;
+
+      // still allow mild flow + separation so it looks alive
+      const nx = p.x * CONFIG.FLOW_SCALE;
+      const ny = p.y * CONFIG.FLOW_SCALE;
+      const ang = noise2(nx, ny) * Math.PI * 2;
+      p.vx += Math.cos(ang) * CONFIG.FLOW_STRENGTH * 0.08;
+      p.vy += Math.sin(ang) * CONFIG.FLOW_STRENGTH * 0.08;
+
+      applySeparation(p);
+      applyMaskBoundary(p);
+      applyMouseSwirl(p);
+
+      p.vx *= Math.pow(CONFIG.DRAG, dt*60);
+      p.vy *= Math.pow(CONFIG.DRAG, dt*60);
+      clampSpeed(p);
+      p.x += p.vx * dt * 60;
+      p.y += p.vy * dt * 60;
     }
+
+    // keep inside canvas (soft wrap)
+    if(p.x < -50) p.x = W + 50;
+    if(p.x > W + 50) p.x = -50;
+    if(p.y < -50) p.y = H + 50;
+    if(p.y > H + 50) p.y = -50;
   }
+}
 
-  function draw() {
-    // trails
-    ctx.fillStyle = `rgba(11,11,15,${BG_FADE})`;
-    ctx.fillRect(0, 0, W, H);
+/* ===========================
+   RENDER
+=========================== */
+function draw(){
+  ctx.clearRect(0,0,W,H);
 
-    // optional guide overlay
-    if (showGuide && guideCanvas) {
-      ctx.save();
-      ctx.globalAlpha = 0.06;
-      ctx.drawImage(guideCanvas, 0, 0);
-      ctx.restore();
-    }
+  // subtle vignette background
+  const g = ctx.createRadialGradient(W*0.5,H*0.5, Math.min(W,H)*0.1, W*0.5,H*0.5, Math.min(W,H)*0.8);
+  g.addColorStop(0, "rgba(255,255,255,0.02)");
+  g.addColorStop(1, "rgba(0,0,0,0.25)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
 
-    // two-pass depth draw for subtle 3D feel
-    ctx.fillStyle = "#ffd65a";
-
-    // back
+  // particles
+  ctx.globalAlpha = CONFIG.PARTICLE_ALPHA;
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  for(const p of particles){
     ctx.beginPath();
-    for (const a of agents) {
-      if (a.z > 0.5) continue;
-      const r = DOT_R * (0.75 + a.z * DEPTH_STRENGTH);
-      ctx.moveTo(a.x + r, a.y);
-      ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
-    }
-    ctx.fill();
-
-    // front
-    ctx.beginPath();
-    for (const a of agents) {
-      if (a.z <= 0.5) continue;
-      const r = DOT_R * (0.75 + a.z * DEPTH_STRENGTH);
-      ctx.moveTo(a.x + r, a.y);
-      ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
-    }
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
     ctx.fill();
   }
+  ctx.globalAlpha = 1;
 
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+  // optional: show mask boundary (debug)
+  // ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  // ctx.strokeRect(maskBounds.minX, maskBounds.minY, maskBounds.maxX-maskBounds.minX, maskBounds.maxY-maskBounds.minY);
+}
+
+/* ===========================
+   MAIN LOOP
+=========================== */
+let last = performance.now();
+let paused = false;
+
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+
+  if(!paused && particles.length){
+    updateMode(dt);
+    updateParticles(dt);
   }
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
 
-  function resize() {
-    dpr = Math.max(1, Math.min(MAX_DPR, window.devicePixelRatio || 1));
-    W = innerWidth;
-    H = innerHeight;
-
-    canvas.width = Math.floor(W * dpr);
-    canvas.height = Math.floor(H * dpr);
-    canvas.style.width = W + "px";
-    canvas.style.height = H + "px";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    buildMask();
-    seed();
-    clearFrame();
+/* ===========================
+   CONTROLS
+=========================== */
+window.addEventListener("keydown", (e) => {
+  if(e.code === "Space"){
+    paused = !paused;
+    e.preventDefault();
   }
+  if(e.key.toLowerCase() === "r"){
+    buildMaskAndParticles();
+  }
+});
 
-  // UI
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    seed();
-    clearFrame();
-  });
-
-  document.getElementById('guideBtn').addEventListener('click', (e) => {
-    showGuide = !showGuide;
-    e.target.textContent = `Guide: ${showGuide ? 'On' : 'Off'}`;
-  });
-
-  document.getElementById('repelBtn').addEventListener('click', (e) => {
-    repulsionOn = !repulsionOn;
-    e.target.textContent = `Repulsion: ${repulsionOn ? 'On' : 'Off'}`;
-  });
-
-  window.addEventListener('resize', resize);
-
-  // Init
-  resize();
-  requestAnimationFrame(loop);
+// start
+resize();
 </script>
 </body>
 </html>
